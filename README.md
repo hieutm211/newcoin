@@ -1,5 +1,5 @@
-#Installation
+# Installation
 ```pip install -r requirements.txt```
 
-#Start Server
+# Start Server
 ```uvicorn main:app```
