@@ -6,6 +6,7 @@ from models import (
     ConnectNodeRequest,
     ConnectNodeResponse,
     MessageResponse,
+    AddTransactionResponse,
 )
 
 from blockchain import Blockchain
@@ -23,7 +24,7 @@ blockchain = Blockchain()
 
 # Mining a new block
 @app.get("/mine_block", response_model=MineBlockResponse)
-def mine_block():
+async def mine_block():
     previous_block = blockchain.get_previous_block()
     previous_proof = previous_block["proof"]
     proof = blockchain.proof_of_work(previous_proof)
@@ -45,14 +46,14 @@ def mine_block():
 
 # Getting the full blockchain
 @app.get("/get_chain", response_model=GetChainResponse)
-def get_chain():
+async def get_chain():
     response = {"chain": blockchain.chain, "length": len(blockchain.chain)}
     return response
 
 
 # Checking if the Blockchain is valid
 @app.get("/is_valid", response_model=MessageResponse)
-def is_valid():
+async def is_valid():
     is_valid = blockchain.is_chain_valid(blockchain.chain)
 
     if is_valid:
@@ -67,18 +68,21 @@ def is_valid():
     return response
 
 
-@app.post("/add_transaction", response_model=MessageResponse)
-def add_transaction(transaction: Transaction):
-    index = blockchain.add_transaction(**transaction)
-    return {"message": f"This transaction will be added to Block {index}"}
+@app.post("/add_transaction", response_model=AddTransactionResponse)
+async def add_transaction(transaction: Transaction):
+    index = blockchain.add_transaction(**vars(transaction))
+    return {
+        "message": f"This transaction will be added to Block {index}",
+        "pending_transactions": blockchain.transactions,
+    }
 
 
 # Connecting new nodes
 
 
 @app.post("/connect_node", response_model=ConnectNodeResponse)
-def connect_node(node: ConnectNodeRequest):
-    blockchain.add_node(node)
+def connect_node(request: ConnectNodeRequest):
+    blockchain.add_node(request.node)
     return {
         "message": "All the nodes are now connected.",
         "total_nodes": len(list(blockchain.nodes)),

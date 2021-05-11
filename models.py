@@ -35,3 +35,7 @@ class MineBlockResponse(Block):
 
 class ConnectNodeResponse(MessageResponse):
     total_nodes: int
+
+
+class AddTransactionResponse(MessageResponse):
+    pending_transactions: List[Transaction]
