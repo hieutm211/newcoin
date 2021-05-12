@@ -1,17 +1,30 @@
 import datetime
 import hashlib
 import json
+from json.decoder import JSONDecodeError
 import requests
 from typing import List, Set
 from models import Block, Transaction
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 class Blockchain:
     def __init__(self):
-        self.chain: List[Block] = []
+        with open("ledger.txt", "r") as f:
+            chain_json = f"[{f.read()[:-1]}]"
+            try:
+                self.chain: List[Block] = json.loads(chain_json)
+            except JSONDecodeError:
+                logging.error("Cannot decode data in 'ledger.txt'.")
+
+        with open("nodes.txt", "r") as f:
+            self.nodes: Set[str] = set(
+                map(lambda line: line[:-1], f.readlines())
+            )
+
         self.transactions: List[Transaction] = []
-        self.create_block(proof=1, previous_hash="0")
-        self.nodes: Set[str] = set()
 
     def create_block(self, proof, previous_hash):
         block: Block = {
@@ -22,7 +35,12 @@ class Blockchain:
             "transactions": self.transactions,
         }
         self.transactions: List[Transaction] = []
+
         self.chain.append(block)
+
+        with open("ledger.txt", "a") as f:
+            f.write(json.dumps(block, indent=4) + ",\n")
+
         return block
 
     def get_previous_block(self):
@@ -71,10 +89,18 @@ class Blockchain:
         return previous_block["index"] + 1
 
     def add_node(self, address):
-        self.nodes.add(address)
+        if address not in self.nodes:
+            with open("nodes.txt", "a") as f:
+                self.nodes.add(address)
+                f.write(address + "\n")
+
+    def get_nodes(self):
+        with open("nodes.txt", "r") as f:
+            nodes = list(map(lambda line: line[:-1], f.readlines()))
+        return nodes
 
     def replace_chain(self):
-        network = self.nodes
+        network = self.get_nodes()
         longest_chain = None
         max_length = len(self.chain)
         for node in network:

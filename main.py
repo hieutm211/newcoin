@@ -7,10 +7,16 @@ from models import (
     ConnectNodeResponse,
     MessageResponse,
     AddTransactionResponse,
+    JoinNetworkRequest,
 )
 
 from blockchain import Blockchain
 from uuid import uuid4
+import requests
+from requests.exceptions import ConnectionError
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 # Creating a Web App
 app = FastAPI()
@@ -29,9 +35,6 @@ async def mine_block():
     previous_proof = previous_block["proof"]
     proof = blockchain.proof_of_work(previous_proof)
     previous_hash = blockchain.hash(previous_block)
-    blockchain.add_transaction(
-        sender=node_address, receiver="Hadelin", amount=1
-    )
     block = blockchain.create_block(proof, previous_hash)
 
     return {
@@ -81,7 +84,7 @@ async def add_transaction(transaction: Transaction):
 
 
 @app.post("/connect_node", response_model=ConnectNodeResponse)
-def connect_node(request: ConnectNodeRequest):
+async def connect_node(request: ConnectNodeRequest):
     blockchain.add_node(request.node)
     return {
         "message": "All the nodes are now connected.",
@@ -91,7 +94,7 @@ def connect_node(request: ConnectNodeRequest):
 
 # Replaceing the chain by the longest chain if needed
 @app.get("/replace_chain", response_model=MessageResponse)
-def replace_chain():
+async def replace_chain():
     is_chain_replaced = blockchain.replace_chain()
     if is_chain_replaced:
         response = {
@@ -108,5 +111,15 @@ def replace_chain():
     return response
 
 
-# Create a Cryptocurrency
-# Decentralizing blockchain
+@app.post("/join_network")
+def join_network(request: JoinNetworkRequest):
+    nodes = blockchain.get_nodes()
+    for node in nodes:
+        try:
+            requests.post(
+                f"http://{node}/connect_node", json={"node": request.node}
+            )
+        except ConnectionError:
+            logging.error(f"ConnectionError: Cannot connect to '{node}'.")
+        else:
+            logging.info(f"Connected to node '{node}'.")

@@ -39,3 +39,7 @@ class ConnectNodeResponse(MessageResponse):
 
 class AddTransactionResponse(MessageResponse):
     pending_transactions: List[Transaction]
+
+
+class JoinNetworkRequest(BaseModel):
+    node: str
