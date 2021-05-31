@@ -1,21 +1,28 @@
+from configs import MAX_TRANSACTIONS_PER_BLOCK
 import datetime
 import hashlib
 import json
 from json.decoder import JSONDecodeError
+from utils import standardize_key, verify_signature
 import requests
 from typing import List, Set
 from models import Block, Transaction
 import logging
+from Crypto.PublicKey import RSA
 
 logging.basicConfig(level=logging.INFO)
 
 
 class Blockchain:
     def __init__(self):
+        self.transactions: List[Transaction] = []
+
         with open("ledger.txt", "r") as f:
             chain_json = f"[{f.read()[:-1]}]"
             try:
                 self.chain: List[Block] = json.loads(chain_json)
+                if len(self.chain) == 0:
+                    self.create_block(0, "null")
             except JSONDecodeError:
                 logging.error("Cannot decode data in 'ledger.txt'.")
 
@@ -24,22 +31,22 @@ class Blockchain:
                 map(lambda line: line[:-1], f.readlines())
             )
 
-        self.transactions: List[Transaction] = []
-
     def create_block(self, proof, previous_hash):
         block: Block = {
             "index": len(self.chain) + 1,
             "timestamp": str(datetime.datetime.now()),
             "proof": proof,
             "previous_hash": previous_hash,
-            "transactions": self.transactions,
+            "transactions": self.transactions[:MAX_TRANSACTIONS_PER_BLOCK],
         }
-        self.transactions: List[Transaction] = []
+        self.transactions = self.transactions[MAX_TRANSACTIONS_PER_BLOCK:]
 
         self.chain.append(block)
 
         with open("ledger.txt", "a") as f:
-            f.write(json.dumps(block, indent=4) + ",\n")
+            if proof != 0:
+                f.write("\n")
+            f.write(json.dumps(block, indent=4) + ",")
 
         return block
 
@@ -81,12 +88,77 @@ class Blockchain:
             block_index += 1
         return True
 
-    def add_transaction(self, sender, receiver, amount):
+    def add_transaction(self, sender, receiver, amount, signature):
+        # verify transaction
+        message = json.dumps({
+            "sender": sender,
+            "receiver": receiver,
+            "amount": amount
+        })
+
+        if sender != "root":
+            try:
+                RSA.import_key(standardize_key(sender))
+            except ValueError:
+                raise ValueError("add_transaction: invalid sender")
+
+            try:
+                RSA.import_key(standardize_key(receiver))
+            except ValueError:
+                raise ValueError("add_transaction: invalid receiver")
+
+            verify_signature(message, sender, signature)
+
+            current_balance = self.get_balance(sender)["total"]
+            print(sender)
+            print(self.get_balance(sender))
+            if current_balance < amount:
+                raise ValueError("Not enough money.")
+
+        # verified. add transaction
         self.transactions.append(
             {"sender": sender, "receiver": receiver, "amount": amount}
         )
         previous_block = self.get_previous_block()
         return previous_block["index"] + 1
+
+    def get_balance(self, address):
+        income = 0
+        outcome = 0
+        for block in self.chain:
+            for transaction in block["transactions"]:
+                if repr(transaction["sender"]) == repr(address):
+                    outcome += transaction["amount"]
+                if repr(transaction["receiver"]) == repr(address):
+                    income += transaction["amount"]
+
+        return {
+            "total": income - outcome,
+            "income": income,
+            "outcome": outcome
+        }
+
+    def get_transactions(self, address):
+        transactions = {
+            "pending":  [],
+            "success":  []
+        }
+
+        for block in self.chain:
+            for transaction in block["transactions"]:
+                sender = repr(transaction["sender"])
+                receiver = repr(transaction["receiver"])
+                if (sender == repr(address) or receiver == repr(address)):
+                    transactions["success"].append(transaction)
+
+        for transaction in self.transactions:
+            print(transaction)
+            sender = repr(transaction["sender"])
+            receiver = repr(transaction["receiver"])
+            if (sender == repr(address) or receiver == repr(address)):
+                transactions["pending"].append(transaction)
+
+        return transactions
 
     def add_node(self, address):
         if address not in self.nodes:

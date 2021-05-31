@@ -29,12 +29,13 @@ class ConnectNodeRequest(BaseModel):
     node: str
 
 
-class MineBlockResponse(Block):
-    message: str
-
-
 class ConnectNodeResponse(MessageResponse):
     total_nodes: int
+
+
+class AddTransactionRequest(BaseModel):
+    transaction: Transaction
+    signature: str
 
 
 class AddTransactionResponse(MessageResponse):
@@ -43,3 +44,28 @@ class AddTransactionResponse(MessageResponse):
 
 class JoinNetworkRequest(BaseModel):
     node: str
+
+
+class NewWalletResponse(BaseModel):
+    private_key: str
+    public_key: str
+
+
+class NewTransactionRequest(BaseModel):
+    transaction: Transaction
+    private_key: str
+
+
+class GetBalanceRequest(BaseModel):
+    address: str
+
+
+class GetBalanceResponse(BaseModel):
+    total: float
+    income: float
+    outcome: float
+
+
+class GetTransactionResponse(BaseModel):
+    pending: List[Transaction]
+    success: List[Transaction]
